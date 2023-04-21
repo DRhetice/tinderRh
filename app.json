@@ -4,10 +4,10 @@
     "slug": "tinderRh",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/tinder.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/tinder.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
