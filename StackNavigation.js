@@ -7,6 +7,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import useAuth from "./hooks/useAuth";
 import StartScreen from "./screens/StartScreen";
 import RegisterScreen from "./screens/RegisterScreen";
+import MatchScreen from "./screens/MatchScreen";
+import MessagesScreen from "./screens/MessagesScreen";
 
 const Stack = createNativeStackNavigator();
 const StackNavigation = () => {
@@ -16,25 +18,24 @@ const StackNavigation = () => {
     <Stack.Navigator>
       {user ? (
         <>
-          <Stack.Group screenOptions={{  headerShown:false }}>
-            <Stack.Screen
-              name="Home"
-             
-              component={HomeScreen}
-            />
-            <Stack.Screen
-              name="Chat"
-  
-              component={ChatScreen}
-            />
+          <Stack.Group screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="Message" component={MessagesScreen} />
           </Stack.Group>
 
-          <Stack.Group  screenOptions={{ presentation: "modal" , headerShown:false }}>
-            <Stack.Screen
-              name="Modal"
-             
-              component={ModalScreen}
-            />
+          <Stack.Group
+            screenOptions={{ presentation: "modal", headerShown: false }}
+          >
+            <Stack.Screen name="Modal" component={ModalScreen} />
+          </Stack.Group>
+          <Stack.Group
+            screenOptions={{
+              presentation: "transparentModal",
+              headerShown: false,
+            }}
+          >
+            <Stack.Screen name="Match" component={MatchScreen} />
           </Stack.Group>
         </>
       ) : (

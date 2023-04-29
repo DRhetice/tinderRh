@@ -16,7 +16,19 @@ import {
 } from "react-native-heroicons/solid";
 import { useNavigation } from "@react-navigation/native";
 import Swiper from "react-native-deck-swiper";
-import { collection, doc, getDocs, onSnapshot, setDoc } from "firebase/firestore";
+import {
+  DocumentSnapshot,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
+import generateId from "../lib/generateId";
 
 const DUMMY_DATA = [
   {
@@ -65,46 +77,130 @@ const HomeScreen = () => {
 
   useLayoutEffect(() => {
     onSnapshot(doc(db, "users", user.uid), (snapshot) => {
-      if(!snapshot.exists()){
-        navigation.navigate('Modal');
+      if (!snapshot.exists()) {
+        navigation.navigate("Modal");
       }
     });
   }, []);
-  
 
-  useEffect(()=>{
-  let unsub;
-    const passes = getDocs(collection(db,"users", user.uid, "passes")).then(
-      (snapshot)=>snapshot.docs.map((doc)=>doc.id)
-    )
-const passedUserIds = passes.length >0 ? passes: ["test"]
+  useEffect(() => {
+    const fetchCard = async () => {
+      const passes = await getDocs(
+        collection(db, "users", user.uid, "passes")
+      ).then((snapshot) => snapshot.docs.map((doc) => doc.id));
+      const swipes = await getDocs(
+        collection(db, "users", user.uid, "swipes")
+      ).then((snapshot) => snapshot.docs.map((doc) => doc.id));
+      const passedUserIds = passes.length > 0 ? passes : ["test"];
+      const swipedUserIds = swipes.length > 0 ? swipes : ["test"];
 
-const fetchCard = async ()=>{
-  unsub = onSnapshot(collection(db, 'users'), (snapshot)=>{
-    setProfiles(
-      snapshot.docs.filter((doc)=>doc.id !== user.uid).map((doc)=>({
-        id: doc.id,
-        ...doc.data(),
-      }))
+      console.log([...passedUserIds, ...swipedUserIds]);
+      const unsub = onSnapshot(
+        query(
+          collection(db, "users"),
+          where("id", "not-in", [...passedUserIds, ...swipedUserIds])
+        ),
+        (snapshot) => {
+          setProfiles(
+            snapshot.docs
+              .filter((doc) => doc.id !== user.uid)
+              .map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+              }))
+          );
+        }
+      );
+      return () => unsub();
+    };
+    fetchCard();
+  }, [db, user.uid]);
+
+  // useEffect(() => {
+  //   const fetchCard = async () => {
+  //     let unsub;
+  //     const passes = await getDocs(
+  //       collection(db, "users", user.uid, "passes")
+  //     ).then((snapshot) => snapshot.docs.map((doc) => doc.id));
+  //     const swipes = await getDocs(
+  //       collection(db, "users", user.uid, "swipes")
+  //     ).then((snapshot) => snapshot.docs.map((doc) => doc.id));
+  //     const passedUserIds = passes.length > 0 ? passes : ["test"];
+  //     const swipedUserIds = swipes.length > 0 ? swipes : ["test"];
+
+  //     console.log([...passedUserIds, ...swipedUserIds]);
+  //     unsub = onSnapshot(
+  //       query(
+  //         collection(db, "users"),
+  //         where("id", "not-in", [...passedUserIds, ...swipedUserIds])
+  //       ),
+  //       (snapshot) => {
+  //         setProfiles(
+  //           snapshot.docs
+  //             .filter((doc) => doc.id !== user.uid)
+  //             .map((doc) => ({
+  //               id: doc.id,
+  //               ...doc.data(),
+  //             }))
+  //         );
+  //       }
+  //     );
+  //   };
+  //   fetchCard();
+  //   return unsub;
+  // }, [db]);
+
+  const swipeLeft = async (cardIndex) => {
+    if (!profiles[cardIndex]) return;
+    const userSwiped = profiles[cardIndex];
+    setDoc(doc(db, "users", user.uid, "passes", userSwiped.id), userSwiped);
+  };
+  const swipeRight = async (cardIndex) => {
+    if (!profiles[cardIndex]) return;
+    const userSwiped = profiles[cardIndex];
+
+    const loggedInprofiles = await (
+      await getDoc(doc(db, "users", user.uid))
+    ).data();
+    // chek if the user swiped on you
+    getDoc(doc(db, "users", userSwiped.id, "swipes", user.uid)).then(
+      (documentSnapshot) => {
+        if (documentSnapshot.exists()) {
+          //user had matched with you before you matched with then...
+
+          console.log(`you matches whive ${userSwiped.job}`);
+          setDoc(
+            doc(db, "users", user.uid, "swipes", userSwiped.id),
+            userSwiped
+          );
+          // create a Matche
+
+          setDoc(doc(db, 'matches', generateId(user.uid, userSwiped.id)),{
+            users : {
+              [user.uid]: loggedInprofiles,
+              [userSwiped.id]: userSwiped,
+            },
+            usersMatched: [user.uid, userSwiped.id],
+            timestamp: serverTimestamp(),
+          })
+          navigation.navigate("Match",{
+            loggedInprofiles,
+            userSwiped
+          })
+
+        } else {
+          console.log(
+            `You swiped on  ${userSwiped.displayName} (${userSwiped.job})`
+          );
+
+          setDoc(
+            doc(db, "users", user.uid, "swipes", userSwiped.id),
+            userSwiped
+          );
+        }
+      }
     );
-  });
-}; fetchCard();
-return unsub
-},[])
-
-const swipeLeft =async (cardIndex)=>{
-  if(!profiles[cardIndex]) return;
-  const userSwiped = profiles[cardIndex];
-  setDoc(doc(db,"users",user.uid,'passes', userSwiped.id),
-  userSwiped);
-}
-const swipeRight =async (cardIndex)=>{
-  if(!profiles[cardIndex]) return;
-  const userSwiped = profiles[cardIndex];
-  setDoc(doc(db,"users",user.uid,'passes', userSwiped.id),
-  userSwiped);
-}
-  
+  };
 
   console.log(profiles);
   return (
@@ -147,12 +243,11 @@ const swipeRight =async (cardIndex)=>{
           verticalSwipe={false}
           onSwipedLeft={(cardIndex) => {
             console.log("Swip pass");
-            swipeLeft(cardIndex)
-
+            swipeLeft(cardIndex);
           }}
           onSwipedRight={(cardIndex) => {
             console.log("Swipe MATCH");
-            swipeRight(cardIndex)
+            swipeRight(cardIndex);
           }}
           overlayLabels={{
             left: {
@@ -187,9 +282,7 @@ const swipeRight =async (cardIndex)=>{
                 />
                 <View className="absolute bottom-0 bg-white w-full flex-row justify-between items-center h-20 px-6 py-2 rounded-b-xl shadow-xl">
                   <View>
-                    <Text className="text-xl font-bold">
-                     ici sera le nom 
-                    </Text>
+                    <Text className="text-xl font-bold">ici sera le nom</Text>
                     <Text>{card.job} </Text>
                   </View>
                   <Text className="text-2xl font-bold">{card.age} </Text>
